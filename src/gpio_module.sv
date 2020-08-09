@@ -47,12 +47,14 @@ end
 always_comb
 begin
     gpio_regs_n = gpio_regs_q;
+    wb_bus.wb_err = 1'b0;
+    wb_bus.wb_ack = 1'b0;
     irq_o  = 'b0;
 
     // WB slave
     if(wb_bus.wb_cyc && wb_bus.wb_stb) begin
         wb_bus.wb_ack = 1'b1;
-        if(wb_bus.wb_adr > 32'h12)
+        if(wb_bus.wb_adr > 32'h10)
             // If the address is out of bounds, return error
             wb_bus.wb_err = 1'b1;
         else begin
