@@ -32,10 +32,13 @@ module gpio_module#(
 logic [4:0][31:0] gpio_regs_n;
 logic [4:0][31:0] gpio_regs_q;
 
+logic [31:0] gpio_do;
+
 logic [N_GPIOS-1:0] gpio_vi;
 logic [N_GPIOS-1:0] gpio_vo;
 
 assign dir_o = gpio_regs_q[`GPIO_DIR][N_GPIOS-1:0];
+assign wb_bus.wb_dat_sm = gpio_do;
 
 genvar ii;
 for(ii = 0; ii < N_GPIOS; ii = ii + 1) begin
@@ -50,6 +53,7 @@ begin
     wb_bus.wb_err = 1'b0;
     wb_bus.wb_ack = 1'b0;
     irq_o  = 'b0;
+    gpio_do = 'b0;
 
     // WB slave
     if(wb_bus.wb_cyc && wb_bus.wb_stb) begin
@@ -63,7 +67,7 @@ begin
                 gpio_regs_n[wb_bus.wb_adr[4:2]] = wb_bus.wb_dat_ms;
             end else begin
                 // Reading (only supports full 32 bit reading)
-                wb_bus.wb_dat_sm = gpio_regs_q[wb_bus.wb_adr[4:2]];
+                gpio_do = gpio_regs_q[wb_bus.wb_adr[4:2]];
             end
         end
     end
