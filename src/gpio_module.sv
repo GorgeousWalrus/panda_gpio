@@ -20,25 +20,26 @@
 module gpio_module#(
     parameter N_GPIOS = 8
 )(
-    input logic                 clk,
-    input logic                 rstn_i,
     output logic [N_GPIOS-1:0]  dir_o,
     output logic [N_GPIOS-1:0]  val_o,
     input logic [N_GPIOS-1:0]   val_i,
     output logic [N_GPIOS-1:0]  irq_o,
-    wb_bus_t.slave              wb_bus
+    apb_bus_t.slave             apb_bus
 );
 
 logic [4:0][31:0] gpio_regs_n;
 logic [4:0][31:0] gpio_regs_q;
 
-logic [31:0] gpio_do;
+logic [31:0] PRDATA;
+logic        PREADY;
 
 logic [N_GPIOS-1:0] gpio_vi;
 logic [N_GPIOS-1:0] gpio_vo;
 
 assign dir_o = gpio_regs_q[`GPIO_DIR][N_GPIOS-1:0];
-assign wb_bus.wb_dat_sm = gpio_do;
+
+assign apb_bus.PRDATA = PRDATA;
+assign apb_bus.PREADY = PREADY;
 
 genvar ii;
 for(ii = 0; ii < N_GPIOS; ii = ii + 1) begin
@@ -49,27 +50,19 @@ end
 
 always_comb
 begin
-    gpio_regs_n = gpio_regs_q;
-    wb_bus.wb_err = 1'b0;
-    wb_bus.wb_ack = 1'b0;
-    irq_o  = 'b0;
-    gpio_do = 'b0;
+    PREADY = 1'b0;
+    PRDATA = 'b0;
 
-    // WB slave
-    if(wb_bus.wb_cyc && wb_bus.wb_stb) begin
-        wb_bus.wb_ack = 1'b1;
-        if(wb_bus.wb_adr > 32'h10)
-            // If the address is out of bounds, return error
-            wb_bus.wb_err = 1'b1;
-        else begin
-            if(wb_bus.wb_we) begin
-                // Writing
-                gpio_regs_n[wb_bus.wb_adr[4:2]] = wb_bus.wb_dat_ms;
-            end else begin
-                // Reading (only supports full 32 bit reading)
-                gpio_do = gpio_regs_q[wb_bus.wb_adr[4:2]];
-            end
-        end
+    gpio_regs_n = gpio_regs_q;
+    irq_o  = 'b0;
+
+    // APB slave
+    if(apb_bus.PSEL && apb_bus.PENABLE) begin
+        PREADY = 1'b1;
+        if(apb_bus.PWRITE) // Write
+            gpio_regs_n[apb_bus.PADDR[4:2]] = apb_bus.PWDATA;
+        else // Read
+            PRDATA = gpio_regs_q[apb_bus.PADDR[4:2]];
     end
     
     // GPIO
@@ -96,9 +89,9 @@ begin
     end
 end
 
-always_ff @(posedge clk, negedge rstn_i)
+always_ff @(posedge apb_bus.PCLK, negedge apb_bus.PRESETn)
 begin
-    if(!rstn_i) begin
+    if(!apb_bus.PRESETn) begin
         gpio_regs_q[`GPIO_DIR] <= 'b0;
         gpio_regs_q[`GPIO_VAL] <= 'b0;
         gpio_regs_q[`GPIO_INV] <= 'b0;
