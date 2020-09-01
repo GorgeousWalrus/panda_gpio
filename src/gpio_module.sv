@@ -42,6 +42,8 @@ logic [4:0][31:0] gpio_regs_q;
 logic [31:0] PRDATA;
 logic        PREADY;
 
+logic [N_GPIOS-1:0] val_i_buf;
+logic [N_GPIOS-1:0] val_i_stbl;
 logic [N_GPIOS-1:0] gpio_vi;
 logic [N_GPIOS-1:0] gpio_vo;
 
@@ -52,7 +54,7 @@ assign apb_bus.PREADY = PREADY;
 
 genvar ii;
 for(ii = 0; ii < N_GPIOS; ii = ii + 1) begin
-    assign gpio_vi[ii] = (gpio_regs_q[GPIO_INV][ii]) ? !val_i[ii] : val_i[ii];
+    assign gpio_vi[ii] = (gpio_regs_q[GPIO_INV][ii]) ? !val_i_stbl[ii] : val_i_stbl[ii];
     assign gpio_vo[ii] = (gpio_regs_q[GPIO_INV][ii]) ? !gpio_regs_q[GPIO_VAL][ii] : gpio_regs_q[GPIO_VAL][ii];
     assign val_o[ii] = (gpio_regs_q[GPIO_DIR][ii]) ? gpio_vo[ii] : 1'b0;
 end
@@ -106,12 +108,16 @@ begin
         gpio_regs_q[GPIO_INV] <= 'b0;
         gpio_regs_q[GPIO_INT_EN] <= 'b0;
         gpio_regs_q[GPIO_INT_T] <= 'b0;
+        val_i_buf <= 'b0;
+        val_i_stbl <= 'b0;
     end else begin
         gpio_regs_q[GPIO_DIR] <= gpio_regs_n[GPIO_DIR];
         gpio_regs_q[GPIO_VAL] <= gpio_regs_n[GPIO_VAL];
         gpio_regs_q[GPIO_INV] <= gpio_regs_n[GPIO_INV];
         gpio_regs_q[GPIO_INT_EN] <= gpio_regs_n[GPIO_INT_EN];
         gpio_regs_q[GPIO_INT_T] <= gpio_regs_n[GPIO_INT_T];
+        val_i_buf <= val_i;
+        val_i_stbl <= val_i_buf;
     end
 end 
 
